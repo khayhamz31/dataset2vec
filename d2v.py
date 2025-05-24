@@ -143,4 +143,4 @@ for splits in [("train",nsource),("valid",ntarget),("test",ntest)]:
     filesmf +=normalized_dataset.orig_files[splits[0]]
 splitmf = np.vstack(splitmf)
 metafeatures = pd.DataFrame(data=splitmf,index=filesmf)
-metafeatures.to_csv(os.path.join(model.directory,"meta-feautures.csv"))
+metafeatures.to_csv(os.path.join(model.directory,"meta-features.csv"))
