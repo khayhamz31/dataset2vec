@@ -26,7 +26,7 @@ def ptp(X):
         domain[i, 1] = np.max(X[:, i])
     return domain
 
-x = pd.read_csv(os.path.join(rootdir,"metafeatures",f"meta-feautures-split-{args.split}-unprocessed.csv"),header=0,index_col=0)
+x = pd.read_csv(os.path.join(rootdir,"metafeatures",f"meta-features-split-{args.split}-unprocessed.csv"),header=0,index_col=0)
 
 domain = ptp(np.asarray(x))
 
