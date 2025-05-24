@@ -23,7 +23,7 @@ parser.add_argument('--split', help='Select metafeature extraction model (one ca
 parser.add_argument('--file', help='Select dataset name', type=str)
 
 args    = parser.parse_args()
-args.file = "abalone"
+
 
 def Dataset2VecModel(configuration):
 
