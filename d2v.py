@@ -18,6 +18,19 @@ import os
 # set random seeds
 tf.random.set_seed(0)
 np.random.seed(42)
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Set memory growth to avoid allocation errors
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f"✅ Using GPU: {gpus}")
+    except RuntimeError as e:
+        print(f"❌ GPU memory growth setup failed: {e}")
+else:
+    print("⚠️ No GPU available. Running on CPU.")
+
 # create parser
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--configuration', help='Select model configuration', type=int,default=0)
@@ -60,7 +73,7 @@ nsource = len(normalized_dataset.orig_data['train'])
 ntarget = len(normalized_dataset.orig_data['valid'])
 ntest   = len(normalized_dataset.orig_data['test'])
 # learning rate scheduler
-optimizer        = tf.keras.optimizers.Adam(configuration['learning_rate'])
+optimizer        = tf.keras.optimizers.legacy.Adam(configuration['learning_rate'])
 # create training model
 # create model
 model     = Model(configuration,rootdir=rootdir)
