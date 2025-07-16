@@ -116,66 +116,70 @@ def print_summary(results_df, classifiers):
         print(f"{clf:15}: {count:3d} wins ({(count/total)*100:5.1f}%)")
 
 
-def main(seed: int):
+def main(seed: int, data_dir: str):  # ✅ added data_dir param
     set_seed(seed)
     classifiers = get_classifiers(seed)
     
-    data_root = "datasets"
     results = []
-    
+
     print(f"🚀 Evaluating algorithm performance (seed={seed})...\n")
     
-    dataset_dirs = [d for d in os.listdir(data_root) if os.path.isdir(os.path.join(data_root, d))]
+    dataset_dirs = [d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))]
     print(f"Found {len(dataset_dirs)} datasets to process\n")
     
     for dataset_name in tqdm(dataset_dirs, desc="Processing datasets"):
-        dataset_path = os.path.join(data_root, dataset_name)
-        
+        dataset_path = os.path.join(data_dir, dataset_name)  # ✅ uses passed-in data_dir
+
         preferred_x_file = f"{dataset_name}_py.dat"
         x_path = os.path.join(dataset_path, preferred_x_file) if preferred_x_file in os.listdir(dataset_path) else None
-        
+
         y_path = next((os.path.join(dataset_path, f) for f in os.listdir(dataset_path) if f == "labels_py.dat"), None)
-        
+
         if not x_path:
             x_path = next((os.path.join(dataset_path, f) for f in os.listdir(dataset_path)
                            if f.endswith("_py.dat") and "label" not in f), None)
-        
+
         if not x_path or not y_path:
             print(f"⚠️ Missing files in '{dataset_name}', skipping.")
             continue
-        
+
         try:
             X = pd.read_csv(x_path, header=None)
             y = pd.read_csv(y_path, header=None).iloc[:, 0]
-            
+
             if len(set(y)) <= 1 or X.shape[0] < 10:
                 print(f"⏭️ Skipping '{dataset_name}' (invalid data)")
                 continue
-            
+
             result = evaluate_algorithms_on_dataset(X, y, dataset_name, classifiers, seed)
             results.append(result)
-        
+
         except Exception as e:
             print(f"❌ Error processing '{dataset_name}': {e}")
-    
+
     if not results:
         print("❌ No datasets were successfully processed!")
         return
-    
+
     df_results = pd.DataFrame(results)
-    out_file = f"algorithm_performance_results_seed_{seed}.csv"
+    data_folder_name = os.path.basename(os.path.normpath(data_dir))  # reuse or define if not done yet
+    out_file = f"{data_folder_name}_seed_{seed}.csv"
     df_results.to_csv(out_file, index=False)
     print(f"\n📁 Results saved to '{out_file}'")
-    
-    create_dataset2vec_files(df_results, classifiers, output_dir=f"algorithm_selection_data_seed_{seed}")
+
+    data_folder_name = os.path.basename(os.path.normpath(data_dir))
+    output_dir = f"{data_folder_name}_seed_{seed}"
+
+    create_dataset2vec_files(df_results, classifiers, output_dir=output_dir)
     print_summary(df_results, classifiers)
-    
+
     print(f"\n🎉 Successfully processed {len(df_results)} datasets with seed {seed}!")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run algorithm evaluation with a custom random seed.")
+    parser = argparse.ArgumentParser(description="Run algorithm evaluation with a custom random seed and dataset directory.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed to use")
+    parser.add_argument("--data_dir", type=str, required=True, help="Directory containing dataset folders")  # ✅ new arg
     args = parser.parse_args()
-    
-    main(seed=args.seed)
+
+    main(seed=args.seed, data_dir=args.data_dir)  # ✅ pass in data_dir
