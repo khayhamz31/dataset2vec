@@ -1,0 +1,50 @@
+leave one out 
+
+jupyter nbconvert --to python notebook.ipynb
+
+jupyter nbconvert --to python runs.ipynb
+
+openml small interface
+
+benchmark suite 225
+
+openml.ipynb - getting a benchmark suite (collection of tasks)
+### Essentially, this script should be able to load a benchmark suite for later use
+??? In the final implementation, should be able to take a task, and then use d2v to predict the algorithm, but what is the point of the benchmark suite then?
+- organising task information into a dataframe 
+- getting meta-features (qualities) and using the actual features into a dataframe (features)
+**  familiarising with the openml qualities, common 
+- downloading the dataset into the format for the d2v stuff to work 
+** automating a script that should be able to do all this
+** Incorporating HPO as well 
+
+ui.py - linking the ui to the openml api 
+
+Approach 
+1. Connecting to the api to list available benchmark suites
+2. Link to available task 
+3. Choose a task and benchmark suite 
+4. Predict the algorithm and hpo based on d2v 
+
+algorithm_performance.py - runs 4 models locally 
+** Should be replaced with openml runs and information from openml, but this will also include information about HPOs
+Stores algorithm performance for each dataset, and also an overall perfomance
+
+meta.ipynb - creates meta models based on meta features and algorithm performance 
+** traditional meta-features (openml.qualities), deep-learning meta-features (d2v) and algorithm performance (openml runs)
+Local check - on whats in d2v but we need to MOVE ON
+
+
+Findings qualities 
+- 255 has 107 qualities, 14 empty
+
+Ask about hpo config stuff
+
+28 Jul progress 
+- Able to create dataframe using openml qualities
+- Able to create dataframe for openml runs 
+
+Next 
+- using d2v for the 225 stuff
+- meta models for that 
+- clean up meta models for the original
