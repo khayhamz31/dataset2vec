@@ -1,0 +1,7 @@
+runner.ipynb acts as the interface
+    Cell 1 : Handles packages and imports functions from scripts
+    Cell 2 : Pulls all the available benchmark suites
+    Cell 3: Activates the dropdown ; datasets downloaded from openml (test_datasets) and qualities downloaded (qualities/traditional)
+    Cell 4: d2v feature extraction (qualities/d2v)
+    Cell 5: Performance metrics - raw runs (runs/raw), runs filtered for algorithms (runs/filtered), runs split by algorithms (runs/algorithm_splits), accuracies for runs (runs/accuracies), statistics (runs/statistics)
+    Cell 6: Training and evaluation of model - model results (models_{seed}) , plot in runner.ipynb
