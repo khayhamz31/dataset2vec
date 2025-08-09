@@ -12,19 +12,22 @@ import random
 import json
 from sklearn.preprocessing import LabelEncoder
 
-def setup_dirs():
+
+def setup_dirs(accuracies_dir):
     os.makedirs("runs/raw", exist_ok=True)
     os.makedirs("runs/filtered", exist_ok=True)
     os.makedirs("runs/algorithm_splits", exist_ok=True)
-    os.makedirs("runs/accuracies", exist_ok=True)
+    os.makedirs(accuracies_dir, exist_ok=True)          # seed-specific accuracies
     os.makedirs("runs/statistics", exist_ok=True)
     os.makedirs("log", exist_ok=True)
     os.makedirs("final", exist_ok=True)
+
 
 def load_flow_map(path="flows/filtered_flow_algorithm_mapping_v2.json"):
     with open(path, "r") as f:
         flow_map = json.load(f)
     return flow_map, set(map(int, flow_map.keys()))
+
 
 def download_runs(task_ids, valid_flow_ids):
     for task_id in tqdm(task_ids, desc="Downloading runs for tasks"):
@@ -53,6 +56,7 @@ def download_runs(task_ids, valid_flow_ids):
         except Exception as e:
             print(f"Error fetching runs for task {task_id}: {e}")
 
+
 def filter_runs(valid_flow_ids):
     log_rows = []
     for filename in tqdm(os.listdir("runs/raw"), desc="Filtering runs"):
@@ -78,8 +82,15 @@ def filter_runs(valid_flow_ids):
                 log_rows.append({'dataset_id': dataset_id, 'status': f"Error: {str(e)}"})
     pd.DataFrame(log_rows).to_csv("log/filtering.csv", index=False)
 
-def split_and_sample(flow_map):
+
+def split_and_sample(flow_map, seed, accuracies_dir, sample_size=50, batch_size=50):
+    """
+    Split runs by algorithm and sample runs reproducibly using `seed`.
+    Accuracies are saved under the seed-specific accuracies_dir (e.g., runs/accuracies_175).
+    """
+    rnd = random.Random(seed)
     flow_to_algorithm = {int(fid): entry["algorithm_type"] for fid, entry in flow_map.items()}
+
     for filename in tqdm(os.listdir("runs/filtered"), desc="Splitting by algorithm"):
         if filename.startswith("dataset_") and filename.endswith("_runs.csv"):
             dataset_id = filename.split("_")[1]
@@ -89,11 +100,13 @@ def split_and_sample(flow_map):
                 if 'run_id' not in runs_df.columns or 'flow_id' not in runs_df.columns:
                     continue
                 runs_df.set_index("run_id", inplace=True)
+
                 dataset_output_dir = os.path.join("runs/algorithm_splits", f"dataset_{dataset_id}")
-                acc_output_dir = os.path.join("runs/accuracies", f"dataset_{dataset_id}")
+                acc_output_dir = os.path.join(accuracies_dir, f"dataset_{dataset_id}")
                 os.makedirs(dataset_output_dir, exist_ok=True)
                 os.makedirs(acc_output_dir, exist_ok=True)
 
+                # group run_ids by algorithm type (from flow map)
                 alg_groups = defaultdict(list)
                 for run_id, row in runs_df.iterrows():
                     flow_id = row["flow_id"]
@@ -102,11 +115,17 @@ def split_and_sample(flow_map):
                         alg_groups[algo].append(run_id)
 
                 for algo, run_ids in alg_groups.items():
+                    # Save all runs of this algo (no sampling) for reference
                     filename_out = f"{algo.lower().replace(' ', '_')}_runs.csv"
                     output_path = os.path.join(dataset_output_dir, filename_out)
                     runs_df.loc[run_ids].to_csv(output_path)
 
-                    sampled = random.sample(run_ids, min(50, len(run_ids)))
+                    # Reproducible sampling
+                    k = min(sample_size, len(run_ids))
+                    if k == 0:
+                        continue
+                    sampled = rnd.sample(run_ids, k)
+
                     sampled_df = runs_df.loc[sampled].copy()
                     accuracy_map = {}
 
@@ -114,7 +133,10 @@ def split_and_sample(flow_map):
                         for i in range(0, len(lst), n):
                             yield lst[i:i + n]
 
-                    for batch in tqdm(list(chunks(sampled, 50)), desc=f"Fetching accuracy for {algo}", leave=False):
+                    # Fetch predictive accuracy for sampled runs
+                    for batch in tqdm(list(chunks(sampled, batch_size)),
+                                      desc=f"Fetching accuracy for {algo} (dataset {dataset_id})",
+                                      leave=False):
                         try:
                             evals = openml.evaluations.list_evaluations(
                                 function='predictive_accuracy',
@@ -125,15 +147,18 @@ def split_and_sample(flow_map):
                                 accuracy_map.update(dict(zip(evals['run_id'], evals['value'])))
                         except Exception as e:
                             print(f"⚠️ Accuracy fetch error: {e}")
+
                     sampled_df['predictive_accuracy'] = sampled_df.index.map(lambda x: accuracy_map.get(int(x)))
                     acc_path = os.path.join(acc_output_dir, f"{algo.lower().replace(' ', '_')}_accuracies.csv")
                     sampled_df.to_csv(acc_path)
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
 
-def generate_statistics():
-    accuracies_dir = "runs/accuracies"
+
+def generate_statistics(accuracies_dir):
     stats_dir = "runs/statistics"
+    os.makedirs(stats_dir, exist_ok=True)
+
     for dataset_folder in os.listdir(accuracies_dir):
         if not dataset_folder.startswith("dataset_"):
             continue
@@ -163,9 +188,12 @@ def generate_statistics():
         if rows:
             pd.DataFrame(rows).set_index("algorithm").to_csv(stats_path)
 
-def build_targets():
-    accuracies_dir = "runs/accuracies"
-    final_path = "final/targets.csv"
+
+def build_targets(accuracies_dir, final_path="final/targets.csv"):
+    """
+    Build meta-learning targets from accuracies under the provided accuracies_dir.
+    Writes to final/targets.csv by default.
+    """
     merged = []
     for dataset_folder in os.listdir(accuracies_dir):
         if not dataset_folder.startswith("dataset_"):
@@ -197,14 +225,22 @@ def build_targets():
     for algo, code in zip(le.classes_, le.transform(le.classes_)):
         print(f"  {code} → {algo}")
 
-def run_extract_runs_for_suite(suite_id, api_key='c0d6200b271e73a8aec0904980876c3c'):
-    from openml import config
 
+def run_extract_runs_for_suite(suite_id, seed, api_key):
+    """
+    Orchestrates fetching runs, filtering, sampling (reproducible via `seed`),
+    saving accuracies under runs/accuracies_{seed}, generating statistics, and
+    building targets from those accuracies.
+    """
     config.apikey = api_key
-    random.seed(31)
+
+    # Seed for reproducible sampling
+    random.seed(seed)
+
+    accuracies_dir = f"runs/accuracies_{seed}"
 
     print("Setting up...")
-    setup_dirs()
+    setup_dirs(accuracies_dir=accuracies_dir)
 
     print("Loading flow map...")
     flow_map, valid_flow_ids = load_flow_map()
@@ -217,20 +253,10 @@ def run_extract_runs_for_suite(suite_id, api_key='c0d6200b271e73a8aec0904980876c
     filter_runs(valid_flow_ids)
 
     print("Splitting and sampling runs...")
-    split_and_sample(flow_map)
+    split_and_sample(flow_map, seed=seed, accuracies_dir=accuracies_dir)
 
     print("Generating statistics...")
-    generate_statistics()
+    generate_statistics(accuracies_dir=accuracies_dir)
 
     print("Building final target file...")
-    build_targets()
-
-def debug_suite_tasks(suite_id):
-    try:
-        suite = openml.study.get_suite(suite_id)
-        task_ids = suite.tasks
-        print(f"📦 Benchmark Suite: {suite.name} (ID: {suite_id})")
-        print(f"🔢 Number of tasks: {len(task_ids)}")
-        print(f"🧪 Task IDs: {task_ids}")
-    except Exception as e:
-        print(f"❌ Failed to fetch suite {suite_id}: {e}")
+    build_targets(accuracies_dir=accuracies_dir, final_path="final/targets.csv")
