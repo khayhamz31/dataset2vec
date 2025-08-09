@@ -58,7 +58,7 @@ class Dataset(object):
     def __get_data(self,file,rootdir):
 
         # read dataset folds
-        datadir = os.path.join(rootdir, "datasets", file)
+        datadir = os.path.join(rootdir, "test_datasets", file)
         # read internal predictors
         data = pd.read_csv(f"{datadir}/{file}_py.dat",header=None)
         # transform to numpy
