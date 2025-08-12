@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import LeaveOneOut
+import glob
 
 
 def ensure_dir(path):
@@ -32,11 +33,19 @@ def load_target_data(target_path="final/targets.csv"):
 def load_metafeatures():
     """Load and combine different types of metafeatures."""
     d2v = pd.read_csv("qualities/d2v/test_combined_metafeatures.csv", index_col=0)
-    traditional = pd.read_csv("qualities/traditional/225_qualities_processed.csv", index_col=0)
+    
+    # Find the processed traditional meta-features file automatically
+    processed_files = glob.glob("qualities/traditional/*_qualities_processed.csv")
+    if not processed_files:
+        raise FileNotFoundError("No processed traditional meta-features file found.")
+    traditional_path = processed_files[0]  # First match
+    traditional = pd.read_csv(traditional_path, index_col=0)
+    
     hybrid = pd.concat([traditional, d2v], axis=1, join='inner')
     y = pd.read_csv("final/targets.csv", index_col=0)
     
     return d2v, traditional, hybrid, y
+
 
 
 def save_datasets_with_targets(d2v, traditional, hybrid, y, output_dir="final"):
