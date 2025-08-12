@@ -48,3 +48,10 @@ Next
 - using d2v for the 225 stuff
 - meta models for that 
 - clean up meta models for the original
+
+
+Improve reprocibility + api key 
+
+Trouble shoot 99 
+
+No imputing for openml qualities 
